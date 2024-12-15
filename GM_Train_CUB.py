@@ -8,7 +8,7 @@ import tensorflow as tf
 import numpy as np
 import GM_Core_featured as gmc
 import GM_GenData
-
+import logging
 
 import os
 os.environ['CUDA_VISIBLE_DEVICES'] = GM_GenData.GPU_ID
@@ -16,8 +16,7 @@ os.environ['CUDA_VISIBLE_DEVICES'] = GM_GenData.GPU_ID
 assert GM_GenData.DATASET == "CUB_2011"
 
 TRAIN_DATASET = GM_GenData.DATASET
-LEARNING_RATE= 0.0001
-
+LEARNING_RATE= 0.0008
 
 num_categories_ge= 200
 num_batch_ge = 10
@@ -31,15 +30,17 @@ if GM_GenData.GRAPH_MODE_CUB=="DEL":
     GRAPH_MODE="DEL"
 elif GM_GenData.GRAPH_MODE_CUB=="KNN":
     GRAPH_MODE=str(GM_GenData.NUM_K_CUB)+"NN"
+elif GM_GenData.GRAPH_MODE_CUB=="FULL":
+    GRAPH_MODE=str(GM_GenData.NUM_K_CUB)+"FULL"
 
-SAVE_ROOT= "trained_models_R1/"+GM_GenData.DATASET+"_EKpb-"+str(KEEPPROB_ENCODER)+"_DKpb-"+str(KEEPPROB_DECODER)+"_CKpb-"+str(KEEPPROB_CONV)\
-           +"_MPI-"+str(MEAN_POOLING_INT)+"_LD-"+str(LATENT_DIM)+"_LR-"+str(LEARNING_RATE)+"_GM-"+GRAPH_MODE+"_RR-"+str(REGULAR_RATE)
+SAVE_ROOT= "trained_models/"+GM_GenData.DATASET
+
 
 def feed_dict_generation(queue, idx):
     print(' ############### feed proc start ########################')
     seed = 66
     rand = np.random.RandomState(seed=seed)
-    batch_size_tr=20
+    batch_size_tr=40
 
     # Number of nodes per graph sampled uniformly from this range.
     num_inner_min_max = (10, 11)
@@ -65,13 +66,13 @@ def train_proc(queue):
 
     # Model parameters.
     # Number of processing (message-passing) steps.
-    num_processing_steps_tr = 10
-    num_processing_steps_ge = 10
+    num_processing_steps_tr = 3
+    num_processing_steps_ge = 3
 
     # Data / training parameters.
-    num_training_iterations = 100000
+    num_training_iterations = 500000 * 20
     theta = 20  # Large values (1000+) make trees. Try 20-60 for good non-trees.
-    batch_size_tr = 20
+    batch_size_tr = 64
     batch_size_ge = 20
     # Number of nodes per graph sampled uniformly from this range.
     num_inner_min_max = (10, 11)
@@ -108,7 +109,7 @@ def train_proc(queue):
     for tv in tf.trainable_variables():
         if tv.name.split("/")[-1][0]=="w":
             weights_list.append(tv)
-    regularizer_l1 = tf.contrib.layers.l1_regularizer(REGULAR_RATE, scope=None)
+    regularizer_l1 = tf.contrib.layers.l2_regularizer(REGULAR_RATE, scope=None)
     regular_loss=tf.contrib.layers.apply_regularization(regularizer_l1, weights_list=weights_list)
     regular_loss = tf.cast(regular_loss,tf.float64)
     # Training loss.
@@ -121,15 +122,24 @@ def train_proc(queue):
     # Optimizer.
     lr = LEARNING_RATE
     global_step = tf.Variable(0, trainable = False)
-    learning_rate = tf.maximum(0.0008, tf.train.exponential_decay(lr, global_step, 1000, 0.99, staircase = False))
+    learning_rate = tf.maximum(0.0002, tf.train.exponential_decay(lr, global_step, 1000, 0.99, staircase = False))
     optimizer = tf.train.AdamOptimizer(learning_rate)
     # optimizer = tf.train.GradientDescentOptimizer(learning_rate)
-    # save path
-    save_path=SAVE_ROOT+"/"
-    if not os.path.exists(save_path):
-        os.makedirs(save_path)
-    record_file=save_path+"records.txt"
-    fid_record=open(record_file,"a")
+    # optimizer = tf.train.RMSPropOptimizer(learning_rate)
+    if not os.path.exists(SAVE_ROOT):
+        os.makedirs(SAVE_ROOT)
+    # set logger
+    logger = logging.getLogger("record_logger")
+    logger.setLevel(logging.INFO)
+    file_handler = logging.FileHandler(os.path.join(SAVE_ROOT, "record.log"), mode="w")
+    file_handler.setLevel(logging.INFO)
+    stream_handler = logging.StreamHandler()
+    stream_handler.setLevel(logging.DEBUG)
+    formatter = logging.Formatter('%(asctime)s - %(message)s')
+    file_handler.setFormatter(formatter)
+    stream_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+    logger.addHandler(stream_handler)
 
     step_op = optimizer.minimize(loss_op_tr, global_step)
 
@@ -145,14 +155,8 @@ def train_proc(queue):
         sess.close()
     except NameError:
         pass
-
-    # gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=GM_GenData.gpu_memory_fraction)
-    # sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
-    # config = tf.ConfigProto()
-    # config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
     sess = tf.Session()
     sess.run(tf.global_variables_initializer())
-
 
     last_iteration = 0
     logged_iterations = []
@@ -181,11 +185,6 @@ def train_proc(queue):
     max_accuracy = 0.0
     min_loss = 1e6
     max_acc = 0.0
-
-    # #load trained model
-    # model_file = "trained_models/truncation/reload_new_sinkhorn_pos_w1_Pascal_EKpb-0.9_DKpb-0.9_CKpb-1.0_MPI-2_LD-128_LR-0.002_GM-DEL_RR-0.0-BBGM/best_model_acc-22000"
-    # saver_loss.restore(sess, model_file)
-    # last_iteration = int(float(model_file.split("-")[-1]))
 
 
     start_time = time.time()
@@ -225,43 +224,29 @@ def train_proc(queue):
             "learning_rate": learning_rate},
              feed_dict=feed_dict_tr)
 
-        # outputs_tr = train_values["outputs"][0]
-        # torch.save(outputs_tr,"./debug/graph_data.pth")
-        # output=train_values["outputs"][-1].nodes.reshape((-1,10,10))[0,:,:]
-        # target_nodes=train_values["target"].nodes.reshape((-1,10,10))[0,:,:]
         training_time = training_time + time.time() - last_time
 
         correct_gt_tr, correct_all_tr, solved_tr, matches_tr, _, _ = gmc.compute_accuracy(
             train_values["target"], train_values["outputs"][-1], use_edges=False)
         if correct_gt_tr < max_accuracy - 0.5:
             print(" **************** exception *****************************************")
-        # if train_values["loss"]==np.nan:
-        #     print("the current loss is nan, iteration = ",iteration)
-        #     break
-        # print(train_values["outputs"][-1].nodes[:input_graphs.n_node[0]].reshape(int(np.sqrt(input_graphs.n_node[0])),-1))
-        # print(input_graphs.nodes)
-        # # print(train_values["outputs"])
-        # print(train_values["outputs"][-1].nodes.reshape(-1,10,10)[0,:,:])
-        # print(np.max(train_values["outputs"][-1].nodes),np.min(train_values["outputs"][-1].nodes),train_values["loss"])
+
         losses_tr.append(train_values["loss"])
         correct_all_tr_list.append(correct_all_tr)
         correct_gt_tr_list.append(correct_gt_tr)
 
         the_time = time.time()
-        elapsed_since_last_log = the_time - last_log_time
-        #if elapsed_since_last_log > log_every_seconds:
-        if iteration % 100 ==0 and (iteration < 10000):
-            record_str = "# {:05d}, FT {:.1f}, TT {:.1f},  Ltr {:.4f}, CAtr {:.4f}, CGtr {:.4f}, LR {:.5f}".format(
+        if iteration % 100 ==0:
+            logger.info("# {:05d}, FT {:.1f}, TT {:.1f},  Ltr {:.4f}, CAtr {:.4f}, CGtr {:.4f}, LR {:.5f}".format(
                 iteration, feed_dict_time, training_time, np.mean(np.array(losses_tr)),
                 np.mean(np.array(correct_all_tr_list)),
                 np.mean(np.array(correct_gt_tr_list)),
-                train_values["learning_rate"])
-            fid_record.writelines(record_str + "\n")
-            print(record_str)
+                train_values["learning_rate"]))
+
             losses_tr.clear()
             correct_all_tr_list.clear()
             correct_gt_tr_list.clear()
-        if iteration % 10000 == 0 and iteration>=10000:
+        if iteration % 10000 == 0:
             last_time = the_time
             for category in range(num_categories_ge):
                 for _ in range(num_batch_ge):
@@ -293,28 +278,23 @@ def train_proc(queue):
 
             elapsed = time.time() - start_time
             if np.mean(np.array(losses_ge)) < min_loss:
-                save_file=save_path+"best_model_loss"
+                save_file=SAVE_ROOT + "/best_model_loss"
                 saver_loss.save(sess, save_file, global_step=iteration)
                 min_loss = np.mean(np.array(losses_ge))
-                # max_acc = correct_gt_ge
             if np.mean(np.array(correct_gt_ge_list)) > max_acc:
-                save_file=save_path+"best_model_acc"
+                save_file=SAVE_ROOT +"/best_model_acc"
                 saver_acc.save(sess, save_file, global_step=iteration)
-                # min_loss = test_values["loss"]
                 max_acc = np.mean(np.array(correct_gt_ge_list))
 
             eval_time = eval_time + time.time() - last_time
-            record_str = "# {:05d}, T {:.1f}, FT {:.1f}, TT {:.1f}, ET {:.1f}, Ltr {:.4f}, CAtr {:.4f}, CGtr {:.4f} Lge {:.4f},  CAge {:.4f}, CGge {:.4f}, NEG {:f}, LR {:.5f}".format(
-                iteration, elapsed, feed_dict_time, training_time, eval_time, np.mean(np.array(losses_tr)), np.mean(np.array(correct_all_tr_list)),
-                np.mean(np.array(correct_gt_tr_list)),np.mean(np.array(losses_ge)), np.mean(np.array(corrects_ge)),
-                np.mean(np.array(correct_gt_ge_list)), np.mean(np.array(matches_ge_list)), train_values["learning_rate"])
-            # record_str="# {:05d}, T {:.1f}, FT {:.1f}, TT {:.1f}, ET {:.1f}, Ltr {:.4f}, CAtr {:.4f}, CGtr {:.4f} Lge {:.4f},  CAge {:.4f}, CGge {:.4f}, NEG {:d}, LR {:.5f}".format(
-            #         iteration, elapsed, feed_dict_time, training_time, eval_time, train_values["loss"], correct_all_tr, correct_gt_tr,
-            #         test_values["loss"], correct_all_ge, correct_gt_ge, matches_ge, train_values["learning_rate"])
+            logger.info(
+                "# {:05d}, T {:.1f}, FT {:.1f}, TT {:.1f}, ET {:.1f}, Ltr {:.4f}, CAtr {:.4f}, CGtr {:.4f} Lge {:.4f},  CAge {:.4f}, CGge {:.4f}, NEG {:f}, LR {:.5f}".format(
+                    iteration, elapsed, feed_dict_time, training_time, eval_time, np.mean(np.array(losses_tr)),
+                    np.mean(np.array(correct_all_tr_list)),
+                    np.mean(np.array(correct_gt_tr_list)), np.mean(np.array(losses_ge)), np.mean(np.array(corrects_ge)),
+                    np.mean(np.array(correct_gt_ge_list)), np.mean(np.array(matches_ge_list)),
+                    train_values["learning_rate"]))
 
-
-            fid_record.writelines(record_str+"\n")
-            print(record_str)
             losses_tr.clear()
             losses_ge.clear()
             corrects_ge.clear()
@@ -324,8 +304,6 @@ def train_proc(queue):
             correct_gt_ge_list.clear()
             matches_ge_list.clear()
             logged_iterations.clear()
-
-    fid_record.close()
 
 if __name__ == '__main__':
 

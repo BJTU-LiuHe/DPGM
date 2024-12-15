@@ -656,68 +656,6 @@ def _gen_edge_dict(tails, heads):
 
     return edge_dict
 
-def _gen_features_Spair_topk(pts0, tails0, heads0,pts_fea0, patches0, pts1, tails1, heads1,pts_fea1, patches1, topk = 5):
-
-    num_nodes0 = pts0.shape[0]
-    num_nodes1 = pts1.shape[0]
-    tails0_sup = heads0_sup = np.array(range(num_nodes0), np.int)
-    tails1_sup = heads1_sup = np.array(range(num_nodes1), np.int)
-    tails0 = np.concatenate((tails0, tails0_sup), axis=-1)
-    tails1 = np.concatenate((tails1, tails1_sup), axis=-1)
-    heads0 = np.concatenate((heads0, heads0_sup), axis=-1)
-    heads1 = np.concatenate((heads1, heads1_sup), axis=-1)
-
-    topk = min(topk, num_nodes1)
-
-    edge_dict0, edge_dict1 = _gen_edge_dict(tails0, heads0), _gen_edge_dict(tails1, heads1)
-
-    similarity = np.matmul(_normalize_features(pts_fea0), _normalize_features(pts_fea1).transpose((1, 0)))
-    rows, cols = _topk_index(similarity, topk)
-    gidx1, gidx2 = rows, cols
-    num_matches = len(rows)
-
-    node_feaLen = pts_fea0.shape[1] + pts_fea1.shape[1]
-    senders, receivers, edge_features = [], [], []# np.int
-    node_features = np.zeros((num_matches, node_feaLen), np.float)
-
-    for i in range(num_matches):
-        cor_node0 = pts_fea0[gidx1[i]]
-        cor_node1 = pts_fea1[gidx2[i]]
-        node_features[i] = np.hstack((cor_node0, cor_node1))
-
-    for ii in range(num_matches):
-        tail0, tail1 = gidx1[ii], gidx2[ii]
-        for jj in range(num_matches):
-            # if ii == jj:
-            #     continue
-
-            head0, head1 = gidx1[jj], gidx2[jj]
-            if head0 in edge_dict0[tail0] and head1 in edge_dict1[tail1]:
-                senders.append(ii)
-                receivers.append(jj)
-
-                cor_tail0 = pts0[tail0]
-                cor_head0 = pts0[head0]
-                cor_tail1 = pts1[tail1]
-                cor_head1 = pts1[head1]
-
-                edge_features.append(np.hstack((cor_tail0, cor_head0, cor_tail1, cor_head1)))
-
-    senders = np.array(senders, np.int)
-    receivers = np.array(receivers, np.int)
-    num_edges = len(edge_features)
-    edge_features = np.array(edge_features, np.float)
-
-    assignGraph = {"gidx1": gidx1,
-                    "gidx2": gidx2,
-                    "node_features": node_features,
-                    "senders": senders,
-                    "receivers": receivers,
-                    "edge_features": edge_features,
-                    "patches1": patches0,
-                    "patches2": patches1}
-    return assignGraph, num_edges > 0
-
 
 def _remove_unmatched_points(anno_names0, anno_pts0, anno_descs0, patches0,
                              anno_names1, anno_pts1, anno_descs1, patches1):

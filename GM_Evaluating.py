@@ -150,7 +150,6 @@ def gen_test_data_VOC(rand,
 
 def read_from_mat(mat_file):
     data = scipy.io.loadmat(mat_file)  # 读取mat文件
-    # print(data.keys())   # 查看mat文件中的所有变量
     K = data['K']
     group1 = data['g1']
     group2 = data['g2']
@@ -326,46 +325,6 @@ def evaluate_Points2D(sess,
         accuracy = accuracy / num_batch
         accuracy_outliers.append(accuracy)
 
-    # nOutlier = 5
-    # accuracy_rhos = []
-    # for rho in range(0, 21, 2):
-    #     num_batch = int(num_sample_per_category / batch_size)
-    #     accuracy = 0.0
-    #     for j in range(num_batch):
-    #         graphs = []
-    #         for k in range(batch_size):
-    #             graph = Points2D._gen_random_graph(rand,
-    #                                                nInner = 10,
-    #                                                nOutlier = nOutlier,
-    #                                                rho = rho)
-    #             graphs.append(graph)
-    #
-    #         feed_dict, raw_graph = gmc.create_feed_dict_by_graphs(graphs,
-    #                                                               input_ph,
-    #                                                               target_ph,
-    #                                                               loss_cof_ph)
-    #         t0 = time.time()
-    #         eval_values = sess.run({
-    #             "target": target_ph,
-    #             "outputs": output_ops_ge},
-    #             feed_dict=feed_dict)
-    #         eval_time = time.time() - t0
-    #
-    #         nodes = eval_values["outputs"][-1].nodes.copy()
-    #         group_indices = eval_values["outputs"][-1].group_indices_1.copy()
-    #         x, count = gmc.greedy_mapping(nodes, group_indices)
-    #         correct_gt_ge, correct_all_ge, solved_ge, matches_ge = gmc.compute_accuracy(
-    #             eval_values["target"], eval_values["outputs"][-1], use_edges=False)
-    #
-    #         print("{}, {}, {:.4f}".format(rho, j, correct_gt_ge))
-    #
-    #         accuracy = accuracy + correct_gt_ge
-    #
-    #     accuracy = accuracy / num_batch
-    #     accuracy_rhos.append(accuracy)
-
-    # for i in range(len(accuracy_rhos)):
-    #     print("RHO = {}: acc = {:.4f}".format(2 * i, accuracy_rhos[i]))
     for i in range(len(accuracy_outliers)):
         print("Outlier = {}: acc = {:.4f}".format(i, accuracy_outliers[i]))
 
@@ -379,33 +338,6 @@ def evaluate_CMUHouse(sess,
     num_frames, num_points, XTs = CMU._load_data_from_mat(mat_file)
 
     max_frames = 111
-    # for gaps in range(10, 101, 10):
-    #     graphs = []
-    #     for start_frame in range(0, max_frames - gaps, 1):
-    #         graph = CMU._gen_random_graph(rand,
-    #                                       XTs,
-    #                                       frame_indexs = (start_frame, start_frame + gaps),
-    #                                       num_inner_min_max = (30, 31))
-    #         graphs.append(graph)
-    #
-    #     feed_dict, raw_graph = gmc.create_feed_dict_by_graphs(graphs,
-    #                                                           input_ph,
-    #                                                           target_ph,
-    #                                                           loss_cof_ph)
-    #     t0 = time.time()
-    #     eval_values = sess.run({
-    #         "target": target_ph,
-    #         "outputs": output_ops_ge},
-    #         feed_dict=feed_dict)
-    #     eval_time = time.time() - t0
-    #
-    #     nodes = eval_values["outputs"][-1].nodes.copy()
-    #     group_indices = eval_values["outputs"][-1].group_indices_1.copy()
-    #     x, count = gmc.greedy_mapping(nodes, group_indices)
-    #     correct_gt_ge, correct_all_ge, solved_ge, matches_ge = gmc.compute_accuracy(
-    #         eval_values["target"], eval_values["outputs"][-1], use_edges=False)
-    #
-    #     print("gaps = {}: {:.4f}".format(gaps, correct_gt_ge))
 
     gaps = 50
     for inners in range(10, 31, 2):
@@ -483,8 +415,7 @@ def evaluate_Willow(sess,
             nodes = eval_values["outputs"][-1].nodes.copy()
             group_indices = eval_values["outputs"][-1].group_indices_1.copy()
             x, count = gmc.greedy_mapping(nodes, group_indices)
-            # correct_gt_ge, correct_all_ge, solved_ge, matches_ge, Xs, gXs = gmc.compute_accuracy(
-            #     eval_values["target"], eval_values["outputs"][-1], use_edges=False)
+
             correct_all_ge, correct_gt_ge, matches_ge, Xs, gXs = gmc.compute_accuracy_hungurian(
                 eval_values["target"], eval_values["outputs"][-1])
 
@@ -495,22 +426,6 @@ def evaluate_Willow(sess,
             num_matches = np.sum(gXs[0])
             num_corrects = np.sum(Xs[0] * gXs[0])
 
-            """
-            # draw match results
-            img = drawMatches(images[0]["image1"], matchInfos[0]["pts1"], matchInfos[0]["tails1"], matchInfos[0]["heads1"], matchInfos[0]["gidx1"],
-                        images[0]["image2"], matchInfos[0]["pts2"], matchInfos[0]["tails2"], matchInfos[0]["heads2"], matchInfos[0]["gidx2"],
-                        Xs[0], gXs[0])
-            saveImgPath = "test_data/Willow/{}_{:05d}_LGM_{}_{}.jpg".format(images[0]["category"], j, num_corrects, num_matches)
-            cv2.imwrite(saveImgPath, img)
-            """
-            # save affinities for learning-free algorithms
-            # matFile = "test_data/Willow/{}_{:05d}.mat".format(images[0]["category"], j)
-            # D = {"gX": gXs[0]}
-            # D.update(affinities[0])
-            # D.update(images[0])
-            # D.update(matchInfos[0])
-            # scipy.io.savemat(matFile, D)
-            # print(matFile)
 
         accuracy = accuracy / num_batch
         accuracy_categories.append(accuracy)
@@ -536,7 +451,6 @@ def evaluate_VOC(sess,
                       "diningtable", "dog", "horse", "motorbike", "person", "pottedplant", "sheep", "sofa", "train",
                       "tvmonitor"]
     VOC_CATEGORIES = ['aeroplane', 'bicycle', 'bird', 'boat',  'car', 'cat', 'chair', 'cow', 'dog', 'horse', 'motorbike', 'person',  'sheep', 'sofa']
-    # VOC_CATEGORIES = ["aeroplane", "bicycle", "bird", "boat", "bottle"]
 
     num_categories = 14
     num_sample_per_category = 1000
@@ -551,17 +465,6 @@ def evaluate_VOC(sess,
         num_batch = int(num_sample_per_category / batch_size)
         accuracy = 0.0
         for j in range(num_batch):
-            # graphs, images, matchInfos, affinities = VOC.gen_random_graphs_VOC(rand,
-            #                                                                    batch_size,
-            #                                                                    num_inner_min_max,
-            #                                                                    num_outlier_min_max,
-            #                                                                    feaType=NODE_VISFEA_TYPE,
-            #                                                                    use_train_set=False,
-            #                                                                    category_id=i)
-            # feed_dict, raw_graph = gmc.create_feed_dict_by_graphs(graphs,
-            #                                                       input_ph,
-            #                                                       target_ph,
-            #                                                       loss_cof_ph)
 
             feed_dict, raw_graphs = gmc.create_feed_dict(
                 rand, batch_size, num_inner_min_max, num_outlier_min_max,
@@ -585,8 +488,6 @@ def evaluate_VOC(sess,
             x, count = gmc.greedy_mapping(nodes, group_indices)
             correct_gt_ge, correct_all_ge, solved_ge, matches_ge, Xs, gXs = gmc.compute_accuracy(
                 eval_values["target"], eval_values["outputs"][-1], use_edges=False)
-            # correct_all_ge, correct_gt_ge, matches_ge, Xs, gXs = gmc.compute_accuracy_hungurian(
-            #     eval_values["target"], eval_values["outputs"][-1])
             print("{}, {}, {:.4f}".format(i, j, correct_gt_ge))
 
             accuracy = accuracy + correct_gt_ge
@@ -594,21 +495,6 @@ def evaluate_VOC(sess,
             num_matches = np.sum(gXs[0])
             num_corrects = np.sum(Xs[0] * gXs[0])
 
-            # draw match results
-            # img = drawMatches(images[0]["image1"], matchInfos[0]["pts1"], matchInfos[0]["tails1"], matchInfos[0]["heads1"], matchInfos[0]["gidx1"],
-            #            images[0]["image2"], matchInfos[0]["pts2"], matchInfos[0]["tails2"], matchInfos[0]["heads2"], matchInfos[0]["gidx2"],
-            #            Xs[0], gXs[0])
-            # saveImgPath = "test_data/VOC/{}_{:05d}_LGM_{}_{}.jpg".format(images[0]["category"], j, num_corrects, num_matches)
-            # cv2.imwrite(saveImgPath, img)
-
-            # save affinities for learning-free algorithms
-            # matFile = "test_data/VOC/{}_{:05d}.mat".format(images[0]["category"], j)
-            # D = {"gX": gXs[0]}
-            # D.update(affinities[0])
-            # D.update(images[0])
-            # D.update(matchInfos[0])
-            # scipy.io.savemat(matFile, D)
-            # print(matFile)
 
         accuracy = accuracy / num_batch
         accuracy_categories.append(accuracy)
@@ -620,109 +506,6 @@ def evaluate_VOC(sess,
 
     avg_accuracy = avg_accuracy / num_categories
     print("AVG_ACCURACY: {:.4f}".format(avg_accuracy))
-
-
-"""
-def evaluate_VOC(sess,
-                      input_ph,
-                      target_ph,
-                      loss_cof_ph,
-                      keepprob_encoder_ph,
-                      keepprob_decoder_ph,
-                      kepp_prob_conv_ph,
-                      output_ops_ge):
-    VOC_CATEGORIES = ["aeroplane", "bicycle", "bird", "boat", "bottle", "bus", "car", "cat", "chair", "cow",
-                      "diningtable", "dog", "horse", "motorbike", "person", "pottedplant", "sheep", "sofa", "train",
-                      "tvmonitor"]
-    #
-    # VOC_CATEGORIES = ["aeroplane"]
-
-    num_categories = 20
-    num_sample_per_category = 100
-    batch_size = 1
-    accuracy_categories = []
-
-    keepprob_encoder, keepprob_decoder = 1.0, 1.0
-    keepprob_conv = 1.0
-
-    last_time = time.time()
-
-    for category in VOC_CATEGORIES:
-        num_batch = int(num_sample_per_category / batch_size)
-        accuracy = 0.0
-        save_path = save_root + category
-        if not os.path.exists(save_path):
-            os.makedirs(save_path)
-
-        for file in record_dict[category]:
-            graphs, _, attri_dicts = VOC.gen_random_graphs_VOC(rand,
-                                                  batch_size,
-                                                  num_inner_min_max,
-                                                  num_outlier_min_max,
-                                                  use_train_set = False,
-                                                  category_id = VOC_CATEGORIES.index(category),
-                                                  record_file = file)
-            feed_dict, raw_graph = gmc.create_feed_dict_by_graphs(graphs,
-                                                                      input_ph,
-                                                                      target_ph,
-                                                                      loss_cof_ph)
-
-            feed_dict[keepprob_encoder_ph] = keepprob_encoder
-            feed_dict[keepprob_decoder_ph] = keepprob_decoder
-            feed_dict[kepp_prob_conv_ph] = keepprob_conv
-
-            t0 = time.time()
-            eval_values = sess.run({
-                "target": target_ph,
-                "outputs": output_ops_ge},
-                feed_dict=feed_dict)
-            eval_time = time.time() - t0
-
-            nodes = eval_values["outputs"][-1].nodes.copy()
-            group_indices = eval_values["outputs"][-1].group_indices_1.copy()
-            x, count = gmc.greedy_mapping(nodes, group_indices)
-            # pts0 = attri_dicts[0]["pts0"]
-            # pts1 = attri_dicts[0]["pts1"]
-            # graph0 = attri_dicts[0]["graph0"]
-            # graph1 = attri_dicts[0]["graph1"]
-            # X_gt = attri_dicts[0]["X_gt"]
-            # X_pred = x.reshape((X_gt.shape[0],X_gt.shape[1]))
-
-            correct_gt_ge, correct_all_ge, solved_ge, matches_ge, Xs, gXs = gmc.compute_accuracy(
-                eval_values["target"], eval_values["outputs"][-1], use_edges=False)
-
-            # acc_cur = correct_gt_ge
-            # save_dict = {
-            #     "pts0": pts0,
-            #     "pts1": pts1,
-            #     "graph0": graph0,
-            #     "graph1": graph1,
-            #     "accuracy": acc_cur,
-            #     "X_pred": X_pred,
-            #     "X_gt": X_gt
-            # }
-            #
-            #
-            # torch.save(save_dict,save_path+"/"+file)
-
-            print("{}, {}, {:.4f}".format(VOC_CATEGORIES.index(category), record_dict[category].index(file), correct_gt_ge))
-
-            accuracy = accuracy + correct_gt_ge
-
-        accuracy = accuracy / len(record_dict[category])
-        accuracy_categories.append(accuracy)
-
-    avg_accuracy = 0.0
-    for i in range(num_categories):
-        avg_accuracy = avg_accuracy + accuracy_categories[i]
-        print("{}: {:.4f}".format(VOC_CATEGORIES[i], accuracy_categories[i]))
-
-    avg_accuracy = avg_accuracy / num_categories
-    print("AVG_ACCURACY: {:.4f}".format(avg_accuracy))
-
-    cost_time = time.time() - last_time
-    print("cost_time = {:.4f}", cost_time)
-"""
 
 
 def drawWillowMatches():
@@ -928,28 +711,9 @@ num_outlier_min_max = (0, 1)
 #
 seed = 0
 rand = np.random.RandomState(seed=seed)
-#
-# gen_test_data_Willow(rand, 1000, num_inner_min_max, num_outlier_min_max)
-# gen_test_data_VOC(rand, 100, num_inner_min_max, num_outlier_min_max)
-# gen_test_data_CMU(rand, num_inner_min_max)
-# gen_test_data_Points2D(rand, 500)
 
-
-## ***********************************************************************
-## evaluation
-## **********************************************************************
-
-# model_file = "trained_models/GM_2DPoints-22020"
-# model_file = "trained_models/GM_CMUHouse-11300"
-# model_file = "trained_models/Willow_RawP-lr=0.0005-6650"
-# model_file =  "trained_models_org/truncation/new_sinkhorn_pos_w1_Pascal_EKpb-0.9_DKpb-1.0_CKpb-0.9_MPI-2_LD-128_LR-0.002_GM-DEL_RR-0.0-BBGM_PB-5/best_model_acc-85000"
-# model_file = "trained_models_org/new_sinkhorn_pos_w1_Pascal_EKpb-0.7_DKpb-0.7_CKpb-1.0_MPI-2_LD-128_LR-0.003_GM-DEL_RR-0.0-BBGM/best_model_acc-87000"
-model_file = "trained_models_R1_augmentation/best_Pascal_EKpb-0.9_DKpb-0.9_CKpb-1.0_MPI-2_LD-128_LR-0.0008_GM-DEL_RR-0.0-BBGM_PB-5/Pascal_RELOAD/best_model_acc-360999"
+model_file = "trained_models/dataset-iteration"
 sess, input_ph, target_ph, loss_cof_ph, keep_prob_encoder_ph, keep_prob_decoder_ph, kepp_prob_conv_ph, output_ops_ge = load_trained_model(
     model_file)
-# evaluate_Points2D(sess, input_ph, target_ph, loss_cof_ph, output_ops_ge)
-# evaluate_CMUHouse(sess, input_ph, target_ph, loss_cof_ph, output_ops_ge)
-# evaluate_Willow(sess, input_ph, target_ph, loss_cof_ph, keep_prob_encoder_ph,keep_prob_decoder_ph,kepp_prob_conv_ph,output_ops_ge)
-# with tf.device('/gpu:0'):
 evaluate_VOC(sess, input_ph, target_ph, loss_cof_ph, keep_prob_encoder_ph, keep_prob_decoder_ph, kepp_prob_conv_ph,
              output_ops_ge)

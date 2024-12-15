@@ -4,7 +4,7 @@ import random
 import GM_GenData
 from GM_GenData import *
 
-ROOT = "/home/6T/lh/data/graph_matching/CUB_2011_features/"
+ROOT = "/home/lh/data/CUB_2011_features/"
 TRAIN_DATA_ROOT = os.path.join(ROOT, "train")
 TEST_DATA_ROOT = os.path.join(ROOT, "test")
 CATEGORIES = os.listdir(TRAIN_DATA_ROOT)
@@ -20,7 +20,76 @@ def _load_mat_file(matfile):
 
     return anno_pts, descs, patches, names
 
-def _gen_features_CUB(pts0, tails0, heads0,pts_feas0, patches0, pts1, tails1, heads1,pts_feas1, patches1):
+def _normalize_features(feature_maps):
+    l2_norms = np.linalg.norm(feature_maps, axis=-1, keepdims=True)
+
+    return feature_maps / l2_norms
+
+
+def _row_col_dict(rows, cols):
+    num_idx = len(rows)
+    rc_dict = {}
+    for idx in range(num_idx):
+        if not rows[idx] in rc_dict.keys():
+            rc_dict[rows[idx]] = [cols[idx]]
+        else:
+            if not cols[idx] in rc_dict[rows[idx]]:
+                rc_dict[rows[idx]].append(cols[idx])
+
+    return rc_dict
+
+def _topk_index(mat, topk):
+    num_rows, num_cols = mat.shape[0], mat.shape[1]
+    cols12 = np.argsort(mat, axis=1)[:, -topk:].flatten()
+    rows12 = np.array(range(num_rows)).repeat(topk)
+
+    rows21 = np.argsort(mat, axis=0)[:, -topk:].flatten()
+    cols21 = np.array(range(num_cols)).repeat(topk)
+
+    rows = rows12.tolist() + rows21.tolist()
+    cols = cols12.tolist() + cols21.tolist()
+
+    rc_dict = _row_col_dict(rows, cols)
+
+    rows_list, cols_list = [], []
+    for row, col_list in rc_dict.items():
+        for col in col_list:
+            rows_list.append(row)
+            cols_list.append(col)
+
+    return np.array(rows_list), np.array(cols_list)
+
+def _gen_edge_dict(tails, heads):
+    num_edges = len(tails)
+    edge_dict = dict()
+    for idx in range(num_edges):
+        tail = tails[idx]
+        head = heads[idx]
+        if not tail in edge_dict.keys():
+            edge_dict[tail] = [head]
+        else:
+            edge_dict[tail].append(head)
+
+    return edge_dict
+
+def _mean_pooling(pts_fea):
+
+    n_pts, dim_feat = pts_fea.shape
+    pts_fea = pts_fea.reshape(-1, int(MEAN_POOLING_INTERVAL_CUB))
+    pts_fea = np.mean(pts_fea, axis=1)
+    pts_fea = pts_fea.reshape((n_pts, -1))
+
+    return pts_fea
+
+def create_mask(shape, probability):
+    prob_value = probability * 1000
+    mask = np.random.randint(1, 1000, size= shape)*1.0
+    mask[mask < prob_value] = 0
+    mask[mask >= prob_value] = 1
+
+    return mask
+
+def _gen_features_CUB(pts0, tails0, heads0,pts_feas0, patches0, pts1, tails1, heads1,pts_feas1, patches1, use_train_set):
     num_nodes0 = pts0.shape[0]
     num_nodes1 = pts1.shape[0]
     num_edges0 = len(tails0)
@@ -32,6 +101,13 @@ def _gen_features_CUB(pts0, tails0, heads0,pts_feas0, patches0, pts1, tails1, he
     for i in range(num_matches):
         gidx1[i] = i // num_nodes1
         gidx2[i] = i % num_nodes1
+
+    if use_train_set:
+        pts_feas0 = pts_feas0 * create_mask(pts_feas0.shape, probability=0.3)
+        pts_feas1 = pts_feas1 * create_mask(pts_feas1.shape, probability=0.3)
+
+    pts_feas0 = _mean_pooling(pts_feas0)
+    pts_feas1 = _mean_pooling(pts_feas1)
 
     node_feaLen = pts_feas0.shape[1] + pts_feas1.shape[1]
     edge_feaLen = 8
@@ -168,9 +244,13 @@ def _gen_random_graph(rand,
     elif GM_GenData.GRAPH_MODE_CUB=="KNN":
         tails0, heads0, dists0, angs0 = GM_GenData._build_knn_graph(pts0,GM_GenData.NUM_K_WILLOW)
         tails1, heads1, dists1, angs1 = GM_GenData._build_knn_graph(pts1,GM_GenData.NUM_K_WILLOW)
+    elif GM_GenData.GRAPH_MODE_CUB == "FULL":
+        tails0, heads0, dists0, angs0 = GM_GenData._build_full_graph(pts0.shape[0])
+        tails1, heads1, dists1, angs1 = GM_GenData._build_full_graph(pts1.shape[0])
 
-    assignGraph = _gen_features_CUB(pts0, tails0, heads0, descs0, patches0, pts1, tails1, heads1, descs1, patches1)
 
+    assignGraph = _gen_features_CUB_augmentation(pts0, tails0, heads0, descs0, patches0, pts1, tails1, heads1, descs1,
+                                             patches1, use_train_set)
 
     gidx1 = assignGraph["gidx1"]
     gidx2 = assignGraph["gidx2"]
@@ -195,6 +275,66 @@ def _gen_random_graph(rand,
 
     return assignGraph, image, matchInfo, affinity
 
+
+def _gen_features_CUB_augmentation(pts0, tails0, heads0,pts_fea0, patches0, pts1, tails1, heads1,pts_fea1, patches1, use_train_set):
+    num_nodes0 = pts0.shape[0]
+    num_nodes1 = pts1.shape[0]
+    num_edges0 = len(tails0)
+    num_edges1 = len(tails1)
+    num_matches = num_nodes0 * num_nodes1
+
+    gidx1 = np.zeros(num_matches, np.int)
+    gidx2 = np.zeros(num_matches, np.int)
+    for i in range(num_matches):
+        gidx1[i] = i / num_nodes1
+        gidx2[i] = i % num_nodes1
+
+    if use_train_set:
+        pts_fea0 = pts_fea0 * create_mask(pts_fea0.shape, probability=0.3)
+        pts_fea1 = pts_fea1 * create_mask(pts_fea1.shape, probability=0.3)
+
+    pts_fea0 = _mean_pooling(pts_fea0)
+    pts_fea1 = _mean_pooling(pts_fea1)
+
+    node_feaLen = pts_fea0.shape[1] + pts_fea1.shape[1]
+    num_assGraph_nodes = num_matches
+    senders, receivers, edge_features = [], [], []
+    node_features = np.zeros((num_assGraph_nodes, node_feaLen), np.float)
+
+    for i in range(num_matches):
+        cor_node0 = pts_fea0[gidx1[i]]
+        cor_node1 = pts_fea1[gidx2[i]]
+        node_features[i] = np.hstack((cor_node0, cor_node1))
+
+    for i in range(num_edges0):
+        cor_tail0 = pts0[tails0[i]]
+        cor_head0 = pts0[heads0[i]]
+        for k in range(num_edges1):
+
+            value = random.randint(0,100)
+            if value > 70 and use_train_set:
+                continue
+
+            cor_tail1 = pts1[tails1[k]]
+            cor_head1 = pts1[heads1[k]]
+
+            senders.append(tails0[i] * num_nodes1 + tails1[k])
+            receivers.append(heads0[i] * num_nodes1 + heads1[k])
+            edge_features.append(np.hstack((cor_tail0, cor_head0, cor_tail1, cor_head1)))
+
+    senders = np.array(senders, np.int)
+    receivers = np.array(receivers, np.int)
+    edge_features = np.array(edge_features, np.float)
+
+    assignGraph = {"gidx1": gidx1,
+                   "gidx2": gidx2,
+                   "node_features": node_features,
+                   "senders": senders,
+                   "receivers": receivers,
+                   "edge_features": edge_features,
+                   "patches1": patches0,
+                   "patches2": patches1}
+    return assignGraph
 
 def gen_random_graphs_CUB(rand,
                               num_examples,
@@ -228,15 +368,5 @@ def gen_random_graphs_CUB(rand,
     return graphs, images, matchInfos, affinities
 
 
-# seed = 66
-# rand = np.random.RandomState(seed=seed)
-# gen_random_graphs_CUB(rand,
-#                               3,
-#                               (10, 11),
-#                               (0, 11),
-#                               "feaType",
-#                               use_train_set = True,
-#                               category_id = -1)
-# print()
 
 

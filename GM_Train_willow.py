@@ -33,14 +33,8 @@ if GM_GenData.GRAPH_MODE_WILLOW=="DEL":
 elif GM_GenData.GRAPH_MODE_WILLOW=="KNN":
     GRAPH_MODE=str(GM_GenData.NUM_K_WILLOW)+"NN"
 
-SAVE_ROOT= "trained_models_R1_augmentation/best_"+GM_GenData.DATASET+"_EKpb-"+str(KEEPPROB_ENCODER)+"_DKpb-"+str(KEEPPROB_DECODER)+"_CKpb-"+str(KEEPPROB_CONV)\
-           +"_MPI-"+str(MEAN_POOLING_INT)+"_LD-"+str(LATENT_DIM)+"_LR-"+str(LEARNING_RATE)+"_GM-"+GRAPH_MODE+"_RR-"+str(REGULAR_RATE)+"-"+NODE_VISFEA_TYPE+"_PB-5_0.2_0.2"
+SAVE_ROOT= "trained_models/"+GM_GenData.DATASET
 
-reload = False
-if os.path.exists(SAVE_ROOT):
-    reload = True
-    path_reload = SAVE_ROOT
-    SAVE_ROOT = os.path.join(SAVE_ROOT, GM_GenData.DATASET + "_RELOAD")
 
 def feed_dict_generation(queue, idx):
     print(' ############### feed proc start ########################')
@@ -200,14 +194,6 @@ def train_proc(queue):
     min_loss = 1e6
     max_acc = 0.0
 
-    # #load trained model
-    if reload:
-        model_file = os.path.join(path_reload, "best_model_acc-335000")
-        saver_loss.restore(sess, model_file)
-        last_iteration = int(float(model_file.split("-")[-1]))
-        print("******************** reloading done! *************************")
-
-    start_eval = False
     start_time = time.time()
     last_log_time = start_time
     feed_dict_time = 0.0
@@ -257,27 +243,24 @@ def train_proc(queue):
 
         the_time = time.time()
         #if elapsed_since_last_log > log_every_seconds:
-        if iteration % 100 ==0 and not start_eval:
+        if iteration % 100 ==0 :
             logger.info("# {:05d}, FT {:.1f}, TT {:.1f},  Ltr {:.4f}, CAtr {:.4f}, CGtr {:.4f}, LR {:.5f}".format(
                 iteration, feed_dict_time, training_time, np.mean(np.array(losses_tr)),
                 np.mean(np.array(correct_all_tr_list)),
                 np.mean(np.array(correct_gt_tr_list)),
                 train_values["learning_rate"]))
 
-            if np.mean(np.array(correct_gt_tr_list))> 0.90:
-                start_eval = True
-
             losses_tr.clear()
             correct_all_tr_list.clear()
             correct_gt_tr_list.clear()
-        if iteration % 1000 == 0 and iteration>=1000 and start_eval:
+        if iteration % 1000 == 0:
             last_time = the_time
             accuracy_dict = {}
             for category in categories:
                 accuracy_dict[category] = []
 
             for category_id in range(num_categories):
-                for _ in range(int(100/batch_size_ge)):
+                for _ in range(int(1000/batch_size_ge)):
                     feed_dict_ge, raw_graphs = gmc.create_feed_dict(
                         rand, batch_size_ge, num_inner_min_max, num_outlier_min_max,
                         NODE_VISFEA_TYPE, input_ph, target_ph, loss_cof_ph,

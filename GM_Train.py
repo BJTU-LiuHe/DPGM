@@ -58,8 +58,7 @@ else:
         GRAPH_MODE=str(GM_GenData.NUM_K_PASCAL)+"NN"
 
 
-SAVE_ROOT= "trained_models/new_sinkhorn_pos_w1_"+GM_GenData.DATASET+"_EKpb-"+str(KEEPPROB_ENCODER)+"_DKpb-"+str(KEEPPROB_DECODER)+"_CKpb-"+str(KEEPPROB_CONV)\
-           +"_MPI-"+str(MEAN_POOLING_INT)+"_LD-"+str(LATENT_DIM)+"_LR-"+str(LEARNING_RATE)+"_GM-"+GRAPH_MODE+"_RR-"+str(REGULAR_RATE)+"-"+NODE_VISFEA_TYPE+"_PB-5"
+SAVE_ROOT= "trained_models/"+GM_GenData.DATASET
 
 def feed_dict_generation(queue, idx):
     print(' ############### feed proc start ########################')
@@ -173,10 +172,6 @@ def train_proc(queue):
     except NameError:
         pass
 
-    # gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=GM_GenData.gpu_memory_fraction)
-    # sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
-    # config = tf.ConfigProto()
-    # config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
     sess = tf.Session()
     sess.run(tf.global_variables_initializer())
 
@@ -209,10 +204,6 @@ def train_proc(queue):
     min_loss = 1e6
     max_acc = 0.0
 
-    # #load trained model
-    # model_file = "trained_models/truncation/reload_new_sinkhorn_pos_w1_Pascal_EKpb-0.9_DKpb-0.9_CKpb-1.0_MPI-2_LD-128_LR-0.002_GM-DEL_RR-0.0-BBGM/best_model_acc-22000"
-    # saver_loss.restore(sess, model_file)
-    # last_iteration = int(float(model_file.split("-")[-1]))
 
 
     start_time = time.time()
@@ -252,24 +243,13 @@ def train_proc(queue):
             "learning_rate": learning_rate},
              feed_dict=feed_dict_tr)
 
-        # outputs_tr = train_values["outputs"][0]
-        # torch.save(outputs_tr,"./debug/graph_data.pth")
-        # output=train_values["outputs"][-1].nodes.reshape((-1,10,10))[0,:,:]
-        # target_nodes=train_values["target"].nodes.reshape((-1,10,10))[0,:,:]
         training_time = training_time + time.time() - last_time
 
         correct_gt_tr, correct_all_tr, solved_tr, matches_tr, _, _ = gmc.compute_accuracy(
             train_values["target"], train_values["outputs"][-1], use_edges=False)
         if correct_gt_tr < max_accuracy - 0.5:
             print(" **************** exception *****************************************")
-        # if train_values["loss"]==np.nan:
-        #     print("the current loss is nan, iteration = ",iteration)
-        #     break
-        # print(train_values["outputs"][-1].nodes[:input_graphs.n_node[0]].reshape(int(np.sqrt(input_graphs.n_node[0])),-1))
-        # print(input_graphs.nodes)
-        # # print(train_values["outputs"])
-        # print(train_values["outputs"][-1].nodes.reshape(-1,10,10)[0,:,:])
-        # print(np.max(train_values["outputs"][-1].nodes),np.min(train_values["outputs"][-1].nodes),train_values["loss"])
+
         losses_tr.append(train_values["loss"])
         correct_all_tr_list.append(correct_all_tr)
         correct_gt_tr_list.append(correct_gt_tr)
@@ -324,11 +304,9 @@ def train_proc(queue):
                 save_file=save_path+"best_model_loss"
                 saver_loss.save(sess, save_file, global_step=iteration)
                 min_loss = np.mean(np.array(losses_ge))
-                # max_acc = correct_gt_ge
             if np.mean(np.array(correct_gt_ge_list)) > max_acc:
                 save_file=save_path+"best_model_acc"
                 saver_acc.save(sess, save_file, global_step=iteration)
-                # min_loss = test_values["loss"]
                 max_acc = np.mean(np.array(correct_gt_ge_list))
 
             eval_time = eval_time + time.time() - last_time
@@ -336,9 +314,6 @@ def train_proc(queue):
                 iteration, elapsed, feed_dict_time, training_time, eval_time, np.mean(np.array(losses_tr)), np.mean(np.array(correct_all_tr_list)),
                 np.mean(np.array(correct_gt_tr_list)),np.mean(np.array(losses_ge)), np.mean(np.array(corrects_ge)),
                 np.mean(np.array(correct_gt_ge_list)), np.mean(np.array(matches_ge_list)), train_values["learning_rate"])
-            # record_str="# {:05d}, T {:.1f}, FT {:.1f}, TT {:.1f}, ET {:.1f}, Ltr {:.4f}, CAtr {:.4f}, CGtr {:.4f} Lge {:.4f},  CAge {:.4f}, CGge {:.4f}, NEG {:d}, LR {:.5f}".format(
-            #         iteration, elapsed, feed_dict_time, training_time, eval_time, train_values["loss"], correct_all_tr, correct_gt_tr,
-            #         test_values["loss"], correct_all_ge, correct_gt_ge, matches_ge, train_values["learning_rate"])
 
 
             fid_record.writelines(record_str+"\n")

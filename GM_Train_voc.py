@@ -35,14 +35,8 @@ elif GM_GenData.GRAPH_MODE_PASCAL=="KNN":
     GRAPH_MODE=str(GM_GenData.NUM_K_PASCAL)+"NN"
 
 
-SAVE_ROOT= "trained_models_R1_augmentation/best_"+GM_GenData.DATASET+"_EKpb-"+str(KEEPPROB_ENCODER)+"_DKpb-"+str(KEEPPROB_DECODER)+"_CKpb-"+str(KEEPPROB_CONV)\
-           +"_MPI-"+str(MEAN_POOLING_INT)+"_LD-"+str(LATENT_DIM)+"_LR-"+str(LEARNING_RATE)+"_GM-"+GRAPH_MODE+"_RR-"+str(REGULAR_RATE)+"-"+NODE_VISFEA_TYPE+"_PB-5"
+SAVE_ROOT= "trained_models/"+GM_GenData.DATASET
 
-reload = False
-if os.path.exists(SAVE_ROOT):
-    reload = True
-    path_reload = SAVE_ROOT
-    SAVE_ROOT = os.path.join(SAVE_ROOT, GM_GenData.DATASET + "_RELOAD")
 
 def feed_dict_generation(queue, idx):
     print(' ############### feed proc start ########################')
@@ -209,7 +203,6 @@ def train_proc(queue):
         last_iteration = int(float(model_file.split("-")[-1]))
         print("******************** reloading done! *************************")
 
-    start_eval = False
     start_time = time.time()
     feed_dict_time = 0.0
     training_time = 0.0
@@ -263,13 +256,10 @@ def train_proc(queue):
                 np.mean(np.array(correct_gt_tr_list)),
                 train_values["learning_rate"]))
 
-            if np.mean(np.array(correct_gt_tr_list))> 0.80:
-                start_eval = True
-
             losses_tr.clear()
             correct_all_tr_list.clear()
             correct_gt_tr_list.clear()
-        if (iteration + 1) % 1000 == 0 and start_eval:
+        if (iteration + 1) % 1000 == 0 :
             last_time = the_time
             accuracy_dict = {}
             for category in categories:

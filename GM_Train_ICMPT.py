@@ -1,6 +1,6 @@
 from graph_nets.demos import models
 from graph_nets import utils_featured_graph
-
+import torch
 import time
 #import threading
 import multiprocessing as mp
@@ -8,6 +8,9 @@ import tensorflow as tf
 import numpy as np
 import GM_Core_featured as gmc
 import GM_GenData
+import logging
+
+from ICMPT import CATEGORIES_TEST
 
 
 import os
@@ -16,9 +19,9 @@ os.environ['CUDA_VISIBLE_DEVICES'] = GM_GenData.GPU_ID
 assert GM_GenData.DATASET == "ICMPT"
 
 TRAIN_DATASET = GM_GenData.DATASET
-LEARNING_RATE= 0.0001
+LEARNING_RATE= 0.001
 
-
+categories = CATEGORIES_TEST
 num_categories_ge= 3
 num_batch_ge = 1000
 KEEPPROB_ENCODER = GM_GenData.KEEPPROB_ENCODER_ICMPT
@@ -32,14 +35,13 @@ if GM_GenData.GRAPH_MODE_ICMPT=="DEL":
 elif GM_GenData.GRAPH_MODE_ICMPT=="KNN":
     GRAPH_MODE=str(GM_GenData.NUM_K_ICMPT)+"NN"
 
-SAVE_ROOT= "trained_models_R1/"+GM_GenData.DATASET+"_EKpb-"+str(KEEPPROB_ENCODER)+"_DKpb-"+str(KEEPPROB_DECODER)+"_CKpb-"+str(KEEPPROB_CONV)\
-           +"_MPI-"+str(MEAN_POOLING_INT)+"_LD-"+str(LATENT_DIM)+"_LR-"+str(LEARNING_RATE)+"_GM-"+GRAPH_MODE+"_RR-"+str(REGULAR_RATE)
+SAVE_ROOT= "trained_models/"+GM_GenData.DATASET
 
 def feed_dict_generation(queue, idx):
     print(' ############### feed proc start ########################')
     seed = 66
     rand = np.random.RandomState(seed=seed)
-    batch_size_tr=2
+    batch_size_tr=8
 
     # Number of nodes per graph sampled uniformly from this range.
     num_inner_min_max = (10, 11)
@@ -69,9 +71,9 @@ def train_proc(queue):
     num_processing_steps_ge = 3
 
     # Data / training parameters.
-    num_training_iterations = 100000
+    num_training_iterations = 500000
     theta = 20  # Large values (1000+) make trees. Try 20-60 for good non-trees.
-    batch_size_tr = 2
+    batch_size_tr = 8
     batch_size_ge = 1
     # Number of nodes per graph sampled uniformly from this range.
     num_inner_min_max = (10, 11)
@@ -121,15 +123,24 @@ def train_proc(queue):
     # Optimizer.
     lr = LEARNING_RATE
     global_step = tf.Variable(0, trainable = False)
-    learning_rate = tf.maximum(0.0008, tf.train.exponential_decay(lr, global_step, 1000, 0.99, staircase = False))
+    learning_rate = tf.maximum(0.0003, tf.train.exponential_decay(lr, global_step, 1000, 0.99, staircase = False))
     optimizer = tf.train.AdamOptimizer(learning_rate)
     # optimizer = tf.train.GradientDescentOptimizer(learning_rate)
-    # save path
-    save_path=SAVE_ROOT+"/"
-    if not os.path.exists(save_path):
-        os.makedirs(save_path)
-    record_file=save_path+"records.txt"
-    fid_record=open(record_file,"a")
+
+    if not os.path.exists(SAVE_ROOT):
+        os.makedirs(SAVE_ROOT)
+    # set logger
+    logger = logging.getLogger("record_logger")
+    logger.setLevel(logging.INFO)
+    file_handler = logging.FileHandler(os.path.join(SAVE_ROOT, "record.log"), mode="w")
+    file_handler.setLevel(logging.INFO)
+    stream_handler = logging.StreamHandler()
+    stream_handler.setLevel(logging.DEBUG)
+    formatter = logging.Formatter('%(asctime)s - %(message)s')
+    file_handler.setFormatter(formatter)
+    stream_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+    logger.addHandler(stream_handler)
 
     step_op = optimizer.minimize(loss_op_tr, global_step)
 
@@ -152,7 +163,6 @@ def train_proc(queue):
     # config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
     sess = tf.Session()
     sess.run(tf.global_variables_initializer())
-
 
     last_iteration = 0
     logged_iterations = []
@@ -182,19 +192,12 @@ def train_proc(queue):
     min_loss = 1e6
     max_acc = 0.0
 
-    # #load trained model
-    # model_file = "trained_models/truncation/reload_new_sinkhorn_pos_w1_Pascal_EKpb-0.9_DKpb-0.9_CKpb-1.0_MPI-2_LD-128_LR-0.002_GM-DEL_RR-0.0-BBGM/best_model_acc-22000"
-    # saver_loss.restore(sess, model_file)
-    # last_iteration = int(float(model_file.split("-")[-1]))
-
-
     start_time = time.time()
     last_log_time = start_time
     feed_dict_time = 0.0
     training_time = 0.0
     eval_time = 0.0
     for iteration in range(last_iteration, num_training_iterations):
-        last_iteration = iteration
         last_time = time.time()
 
         inputs, targets = queue.get(block = True, timeout = None)
@@ -225,24 +228,13 @@ def train_proc(queue):
             "learning_rate": learning_rate},
              feed_dict=feed_dict_tr)
 
-        # outputs_tr = train_values["outputs"][0]
-        # torch.save(outputs_tr,"./debug/graph_data.pth")
-        # output=train_values["outputs"][-1].nodes.reshape((-1,10,10))[0,:,:]
-        # target_nodes=train_values["target"].nodes.reshape((-1,10,10))[0,:,:]
         training_time = training_time + time.time() - last_time
 
         correct_gt_tr, correct_all_tr, solved_tr, matches_tr, _, _ = gmc.compute_accuracy(
             train_values["target"], train_values["outputs"][-1], use_edges=False)
         if correct_gt_tr < max_accuracy - 0.5:
             print(" **************** exception *****************************************")
-        # if train_values["loss"]==np.nan:
-        #     print("the current loss is nan, iteration = ",iteration)
-        #     break
-        # print(train_values["outputs"][-1].nodes[:input_graphs.n_node[0]].reshape(int(np.sqrt(input_graphs.n_node[0])),-1))
-        # print(input_graphs.nodes)
-        # # print(train_values["outputs"])
-        # print(train_values["outputs"][-1].nodes.reshape(-1,10,10)[0,:,:])
-        # print(np.max(train_values["outputs"][-1].nodes),np.min(train_values["outputs"][-1].nodes),train_values["loss"])
+
         losses_tr.append(train_values["loss"])
         correct_all_tr_list.append(correct_all_tr)
         correct_gt_tr_list.append(correct_gt_tr)
@@ -250,72 +242,80 @@ def train_proc(queue):
         the_time = time.time()
         elapsed_since_last_log = the_time - last_log_time
         #if elapsed_since_last_log > log_every_seconds:
-        if iteration % 100 ==0 and (iteration < 10000):
-            record_str = "# {:05d}, FT {:.1f}, TT {:.1f},  Ltr {:.4f}, CAtr {:.4f}, CGtr {:.4f}, LR {:.5f}".format(
+        if iteration % 100 ==0:
+            logger.info("# {:05d}, FT {:.1f}, TT {:.1f},  Ltr {:.4f}, CAtr {:.4f}, CGtr {:.4f}, LR {:.5f}".format(
                 iteration, feed_dict_time, training_time, np.mean(np.array(losses_tr)),
                 np.mean(np.array(correct_all_tr_list)),
                 np.mean(np.array(correct_gt_tr_list)),
-                train_values["learning_rate"])
-            fid_record.writelines(record_str + "\n")
-            print(record_str)
+                train_values["learning_rate"]))
+
             losses_tr.clear()
             correct_all_tr_list.clear()
             correct_gt_tr_list.clear()
-        if iteration % 10000 == 0 and iteration>=10000:
+        if iteration % 10000 :
             last_time = the_time
-            for category in range(num_categories_ge):
-                for _ in range(20):
-                    for _ in range(num_batch_ge):
-                        feed_dict_ge, raw_graphs = gmc.create_feed_dict(
-                            rand, batch_size_ge, num_inner_min_max, num_outlier_min_max,
-                            "NODE_VISFEA_TYPE", input_ph, target_ph, loss_cof_ph,
-                            use_train_set=False,dataset=TRAIN_DATASET,category=category)
+            accuracy_dict = {}
+            for category in categories:
+                accuracy_dict[category] = []
 
-                        feed_dict_ge[keep_prob_encoder_ph]=1.0
-                        feed_dict_ge[keep_prob_decoder_ph] = 1.0
-                        feed_dict_ge[keep_prob_conv_ph]=1.0
-                        test_values = sess.run({
-                            "target": target_ph,
-                            "loss": loss_op_ge,
-                            "outputs": output_ops_ge},
-                              feed_dict=feed_dict_ge)
+            for category_id in range(num_categories_ge):
+                for _ in range(int(1000/batch_size_ge)):
+                    feed_dict_ge, raw_graphs = gmc.create_feed_dict(
+                        rand, batch_size_ge, num_inner_min_max, num_outlier_min_max,
+                        "NODE_VISFEA_TYPE", input_ph, target_ph, loss_cof_ph,
+                        use_train_set=False, dataset=TRAIN_DATASET,category=category_id)
 
+                    feed_dict_ge[keep_prob_encoder_ph]=1.0
+                    feed_dict_ge[keep_prob_decoder_ph] = 1.0
+                    feed_dict_ge[keep_prob_conv_ph]=1.0
+                    test_values = sess.run({
+                        "target": target_ph,
+                        "loss": loss_op_ge,
+                        "outputs": output_ops_ge},
+                        feed_dict=feed_dict_ge)
 
-                        correct_gt_ge, correct_all_ge, solved_ge, matches_ge, _, _ = gmc.compute_accuracy(
-                            test_values["target"], test_values["outputs"][-1], use_edges=False)
+                    correct_gt_ge, correct_all_ge, solved_ge, matches_ge, _, _ = gmc.compute_accuracy(
+                        test_values["target"], test_values["outputs"][-1], use_edges=False)
+                    accuracy_dict[categories[category_id]].append(correct_gt_ge)
 
-                        # losses_tr.append(train_values["loss"])
-                        losses_ge.append(test_values["loss"])
-                        corrects_ge.append(correct_all_ge)
-                        solveds_ge.append(solved_ge)
-                        correct_gt_ge_list.append(correct_gt_ge)
-                        matches_ge_list.append(matches_ge)
-                        logged_iterations.append(iteration)
+                    losses_ge.append(test_values["loss"])
+                    corrects_ge.append(correct_all_ge)
+                    solveds_ge.append(solved_ge)
+                    correct_gt_ge_list.append(correct_gt_ge)
+                    matches_ge_list.append(matches_ge)
+                    logged_iterations.append(iteration)
+
+            accuracy_avg = []
+            for key, value in accuracy_dict.items():
+                accuracy_avg.append(np.mean(value))
+            accuracy_avg = np.mean(accuracy_avg).item()
 
             elapsed = time.time() - start_time
             if np.mean(np.array(losses_ge)) < min_loss:
-                save_file=save_path+"best_model_loss"
+                save_file = SAVE_ROOT + "/best_model_loss"
                 saver_loss.save(sess, save_file, global_step=iteration)
                 min_loss = np.mean(np.array(losses_ge))
-                # max_acc = correct_gt_ge
-            if np.mean(np.array(correct_gt_ge_list)) > max_acc:
-                save_file=save_path+"best_model_acc"
+            if accuracy_avg > max_acc:
+                save_file = SAVE_ROOT + "/best_model_acc"
                 saver_acc.save(sess, save_file, global_step=iteration)
-                # min_loss = test_values["loss"]
-                max_acc = np.mean(np.array(correct_gt_ge_list))
+                max_acc = accuracy_avg
+                torch.save(accuracy_dict, os.path.join(SAVE_ROOT, "accuracy_dict.pth"))
+
+                for key, value in accuracy_dict.items():
+                    logger.info(key + ":" + str(np.mean(value).item()))
+
+                logger.info("avg:" + str(accuracy_avg))
 
             eval_time = eval_time + time.time() - last_time
-            record_str = "# {:05d}, T {:.1f}, FT {:.1f}, TT {:.1f}, ET {:.1f}, Ltr {:.4f}, CAtr {:.4f}, CGtr {:.4f} Lge {:.4f},  CAge {:.4f}, CGge {:.4f}, NEG {:f}, LR {:.5f}".format(
-                iteration, elapsed, feed_dict_time, training_time, eval_time, np.mean(np.array(losses_tr)), np.mean(np.array(correct_all_tr_list)),
-                np.mean(np.array(correct_gt_tr_list)),np.mean(np.array(losses_ge)), np.mean(np.array(corrects_ge)),
-                np.mean(np.array(correct_gt_ge_list)), np.mean(np.array(matches_ge_list)), train_values["learning_rate"])
-            # record_str="# {:05d}, T {:.1f}, FT {:.1f}, TT {:.1f}, ET {:.1f}, Ltr {:.4f}, CAtr {:.4f}, CGtr {:.4f} Lge {:.4f},  CAge {:.4f}, CGge {:.4f}, NEG {:d}, LR {:.5f}".format(
-            #         iteration, elapsed, feed_dict_time, training_time, eval_time, train_values["loss"], correct_all_tr, correct_gt_tr,
-            #         test_values["loss"], correct_all_ge, correct_gt_ge, matches_ge, train_values["learning_rate"])
+            logger.info(
+                "# {:05d}, T {:.1f}, FT {:.1f}, TT {:.1f}, ET {:.1f}, Ltr {:.4f}, CAtr {:.4f}, CGtr {:.4f} Lge {:.4f},  CAge {:.4f}, CGge {:.4f}, NEG {:f}, LR {:.5f}".format(
+                    iteration, elapsed, feed_dict_time, training_time, eval_time, np.mean(np.array(losses_tr)),
+                    np.mean(np.array(correct_all_tr_list)),
+                    np.mean(np.array(correct_gt_tr_list)), np.mean(np.array(losses_ge)), np.mean(np.array(corrects_ge)),
+                    np.mean(np.array(correct_gt_ge_list)), np.mean(np.array(matches_ge_list)),
+                    train_values["learning_rate"]))
 
 
-            fid_record.writelines(record_str+"\n")
-            print(record_str)
             losses_tr.clear()
             losses_ge.clear()
             corrects_ge.clear()
@@ -326,7 +326,6 @@ def train_proc(queue):
             matches_ge_list.clear()
             logged_iterations.clear()
 
-    fid_record.close()
 
 if __name__ == '__main__':
 

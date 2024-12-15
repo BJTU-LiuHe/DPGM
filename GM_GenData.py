@@ -16,90 +16,75 @@ VISFEA_TYPE_PRETRAINED_LFNET = 'preLfNet'
 VISFEA_TYPE_PRETRAINED_VGG16 = 'preVGG16'
 
 
-"""### 整体参数 ###"""
-DATASET="Pascal"            #当前数据集  Willow 或者 Pascal  Spair71k  CUB_2011  ICMPT
-LEARNING_RATE=0.0008        #学习率
-gpu_memory_fraction=1.0     #初始化时程序所占GPU内存的比例
-GPU_ID="1"                  #用第几块GPU来训练模型
+DATASET="Pascal"
+LEARNING_RATE=0.0008
+gpu_memory_fraction=1.0
+GPU_ID="1"
 
 """### QAPDATA ###"""
-# ['bur', 'chr', 'els', 'esc', 'had', 'kra', 'lipa', 'nug', 'rou', 'scr', 'sko', 'ste', 'tai', 'tho', 'wil']
-#['chr', 'esc', 'had', 'kra', 'lipa', 'nug', 'rou', 'scr', 'sko', 'ste', 'tai']
-#[ 'lipa', 'nug', 'scr', 'sko', 'ste', 'tai']
 CLASS_QAPDATA = "sko"
 LATENT_DIM_QAPDATA = 2
-KEEPPROB_ENCODER_QAPDATA=1.0 #在encoder中的dropout中保留多少比例的节点
-KEEPPROB_DECODER_QAPDATA=1.0 #在decoder中的dropout中保留多少比例的节点
-KEEPPROB_CONV_QAPDATA=1.0    #在卷积层中的dropout中保留多少比例的节点
-MEAN_POOLING_INTERVAL_QAPDATA=1   #对vgg16视觉特征进行mean_pooling时每隔多少个元素做mean
-GRAPH_MODE_QAPDATA="DEL"     #构建graph的方式，KNN or DEL
-NUM_K_QAPDATA=3              #KNN 构图模式中，每个节点的邻居数量
+KEEPPROB_ENCODER_QAPDATA=1.0
+KEEPPROB_DECODER_QAPDATA=1.0
+KEEPPROB_CONV_QAPDATA=1.0
+MEAN_POOLING_INTERVAL_QAPDATA=1
+GRAPH_MODE_QAPDATA="DEL"
+NUM_K_QAPDATA=3
 REGULAR_RATE_QAPDATA=0.0000
 
-"""### Willow库 参数 ###"""
-LATENT_DIM_WILLOW=32          #隐含层中的维度
-KEEPPROB_ENCODER_WILLOW=0.5 #在encoder中的dropout中保留多少比例的节点
-KEEPPROB_DECODER_WILLOW=0.5 #在decoder中的dropout中保留多少比例的节点
-KEEPPROB_CONV_WILLOW=1.0   #在卷积层中的dropout中保留多少比例的节点
-MEAN_POOLING_INTERVAL_WILLOW=16 #对vgg16视觉特征进行mean_pooling时每隔多少个元素做mean
-GRAPH_MODE_WILLOW="DEL"         #构建graph的方式，KNN or DEL
-NUM_K_WILLOW=3                  #KNN 构图模式中，每个节点的邻居数量
+"""### Willow ###"""
+LATENT_DIM_WILLOW=32
+KEEPPROB_ENCODER_WILLOW=0.5
+KEEPPROB_DECODER_WILLOW=0.5
+KEEPPROB_CONV_WILLOW=1.0
+MEAN_POOLING_INTERVAL_WILLOW=16
+GRAPH_MODE_WILLOW="DEL"
+NUM_K_WILLOW=3
 REGULAR_RATE_WILLOW=0.0000
-"""### Pascal库 参数 (主要调整LATENT_DIM_PASCAL 和 MEAN_POOLING_INTERVAL) ###"""
-LATENT_DIM_PASCAL=128       #隐含层中的维度
-KEEPPROB_ENCODER_PASCAL=0.9 #在encoder中的dropout中保留多少比例的节点
-KEEPPROB_DECODER_PASCAL=0.9 #在decoder中的dropout中保留多少比例的节点
-KEEPPROB_CONV_PASCAL=1.0    #在卷积层中的dropout中保留多少比例的节点
-MEAN_POOLING_INTERVAL_PASCAL= 2   #对vgg16视觉特征进行mean_pooling时每隔多少个元素做mean
-GRAPH_MODE_PASCAL="DEL"     #构建graph的方式，KNN or DEL
-NUM_K_PASCAL=3              #KNN 构图模式中，每个节点的邻居数量
+"""### Pascal ###"""
+LATENT_DIM_PASCAL=128
+KEEPPROB_ENCODER_PASCAL=0.9
+KEEPPROB_DECODER_PASCAL=0.9
+KEEPPROB_CONV_PASCAL=1.0
+MEAN_POOLING_INTERVAL_PASCAL= 2
+GRAPH_MODE_PASCAL="DEL"
+NUM_K_PASCAL=3
 REGULAR_RATE_PASCAL=0.0000
 
-"""### Spair71k 参数 (主要调整LATENT_DIM_PASCAL 和 MEAN_POOLING_INTERVAL) ###"""
-LATENT_DIM_SPAIR71K=128       #隐含层中的维度
-KEEPPROB_ENCODER_SPAIR71K=0.9 #在encoder中的dropout中保留多少比例的节点
-KEEPPROB_DECODER_SPAIR71K=0.9 #在decoder中的dropout中保留多少比例的节点
-KEEPPROB_CONV_SPAIR71K=1.0    #在卷积层中的dropout中保留多少比例的节点
-MEAN_POOLING_INTERVAL_SPAIR71K=2   #对vgg16视觉特征进行mean_pooling时每隔多少个元素做mean
-GRAPH_MODE_SPAIR71K="DEL"     #构建graph的方式，KNN or DEL
-NUM_K_SPAIR71K=3              #KNN 构图模式中，每个节点的邻居数量
+"""### Spair71k  ###"""
+LATENT_DIM_SPAIR71K=128
+KEEPPROB_ENCODER_SPAIR71K=0.9
+KEEPPROB_DECODER_SPAIR71K=0.9
+KEEPPROB_CONV_SPAIR71K=1.0
+MEAN_POOLING_INTERVAL_SPAIR71K=2
+GRAPH_MODE_SPAIR71K="DEL"
+NUM_K_SPAIR71K=3
 REGULAR_RATE_SPAIR71K=0.0000
 
-"""### CUB_2011 参数 (主要调整LATENT_DIM_PASCAL 和 MEAN_POOLING_INTERVAL) ###"""
-LATENT_DIM_CUB=64       #隐含层中的维度
-KEEPPROB_ENCODER_CUB=1.0 #在encoder中的dropout中保留多少比例的节点
-KEEPPROB_DECODER_CUB=1.0 #在decoder中的dropout中保留多少比例的节点
-KEEPPROB_CONV_CUB=1.0    #在卷积层中的dropout中保留多少比例的节点
-MEAN_POOLING_INTERVAL_CUB=8   #对vgg16视觉特征进行mean_pooling时每隔多少个元素做mean
-GRAPH_MODE_CUB="DEL"     #构建graph的方式，KNN or DEL
-NUM_K_CUB=3              #KNN 构图模式中，每个节点的邻居数量
+"""### CUB_2011###"""
+LATENT_DIM_CUB=64
+KEEPPROB_ENCODER_CUB=1.0
+KEEPPROB_DECODER_CUB=1.0
+KEEPPROB_CONV_CUB=1.0
+MEAN_POOLING_INTERVAL_CUB=8
+GRAPH_MODE_CUB="DEL"
+NUM_K_CUB=3
 REGULAR_RATE_CUB=0.0000
 
-"""### ICMPT 参数 (主要调整LATENT_DIM_PASCAL 和 MEAN_POOLING_INTERVAL) ###"""
-LATENT_DIM_ICMPT=64       #隐含层中的维度
-KEEPPROB_ENCODER_ICMPT=1.0 #在encoder中的dropout中保留多少比例的节点
-KEEPPROB_DECODER_ICMPT=1.0 #在decoder中的dropout中保留多少比例的节点
-KEEPPROB_CONV_ICMPT=1.0    #在卷积层中的dropout中保留多少比例的节点
-MEAN_POOLING_INTERVAL_ICMPT=8   #对vgg16视觉特征进行mean_pooling时每隔多少个元素做mean
-GRAPH_MODE_ICMPT="DEL"     #构建graph的方式，KNN or DEL
-NUM_K_ICMPT=3              #KNN 构图模式中，每个节点的邻居数量
+"""### ICMPT  ###"""
+LATENT_DIM_ICMPT=64
+KEEPPROB_ENCODER_ICMPT=1.0
+KEEPPROB_DECODER_ICMPT=1.0
+KEEPPROB_CONV_ICMPT=1.0
+MEAN_POOLING_INTERVAL_ICMPT=8
+GRAPH_MODE_ICMPT="DEL"
+NUM_K_ICMPT=3
 REGULAR_RATE_ICMPT=0.0000
 
 
 KEYPOINT_PATCH_WIDTH = 16
 KEYPOINT_PATCH_HEIGHT = 16
-# def _compute_SIFT_features(file, pts) :
-#     # extract SIFT features
-#     img = cv2.imread(file, cv2.IMREAD_GRAYSCALE)
-#     sift = cv2.xfeatures2d_SIFT.create()
-#
-#     kps = []
-#     for i in range(pts.shape[0]):
-#         kp = cv2.KeyPoint(pts[i][0], pts[i][1], 16, _class_id = 0)
-#         kps.append(kp)
-#
-#     kps, descs = sift.compute(img, kps)
-#     return kps, descs
+
 
 def _map_cls_to_images(root, categories):
     cls_images = dict()
@@ -310,10 +295,6 @@ def _load_data(ROOT, file_name):
 
     aff_mat = _kronecker_torch(Fi_t, Fj_t)
     aff_mat = aff_mat.squeeze(0).numpy()
-    # aff_mat = aff_mat.numpy()
-    # perm_mat_t = torch.from_numpy(np.expand_dims(perm_mat, axis=0))
-    # perm_mat_vec = perm_mat_t.transpose(1, 2).contiguous().view(1, -1, 1)
-    # sol_v1 = torch.matmul(torch.matmul(perm_mat_vec.transpose(1, 2), aff_mat), perm_mat_vec).view(-1)
 
     adj1, adj2, gX, results = Fi, Fj, perm_mat, sol
 
