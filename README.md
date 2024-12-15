@@ -1,7 +1,7 @@
 # “Deep probabilistic graph matching
 
 ## Requirements
-tensorflow        1.14.0
+tensorflow        1.14.0  
 dm-sonnet         1.23
 
 ## Datasets
